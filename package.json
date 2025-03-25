@@ -1,0 +1,11 @@
+{
+  "name": "lambda-auth-cpf",
+  "version": "1.0.0",
+  "main": "src/handler.js",
+  "scripts": {
+    "start": "node src/handler.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.9.0"
+  }
+}
