@@ -6,6 +6,6 @@
     "start": "node src/handler.js"
   },
   "dependencies": {
-    "mysql2": "^3.9.0"
+    "mysql2": "^3.14.0"
   }
 }

@@ -1,39 +1,79 @@
-const pool = require('./db');
+const mysql = require('mysql2/promise');
+const AWS = require('aws-sdk');
+
+const {
+  DB_HOST,
+  DB_NAME,
+  DB_USER,
+  DB_PASS,
+  COGNITO_USER_POOL_ID,
+  COGNITO_CLIENT_ID,
+  AWS_REGION = 'us-east-1',
+} = process.env;
+
+const cognito = new AWS.CognitoIdentityServiceProvider({ region: AWS_REGION });
 
 exports.handler = async (event) => {
-  const cpf = event.queryStringParameters?.cpf;
-
-  if (!cpf) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: 'CPF é obrigatório na query string' }),
-    };
-  }
-
   try {
-    const [rows] = await pool.query('SELECT * FROM clientes WHERE id = ?', [cpf]);
+    const body = event.body ? JSON.parse(event.body) : {};
+    const { cpf, senha } = body;
 
-    if (rows.length === 0) {
+    if (!cpf || !senha) {
       return {
-        statusCode: 404,
-        body: JSON.stringify({ error: 'Cliente não encontrado' }),
+        statusCode: 400,
+        body: JSON.stringify({ error: 'CPF e senha são obrigatórios.' }),
       };
     }
 
-    const cliente = rows[0];
+    // Conexão com o banco
+    const connection = await mysql.createConnection({
+      host: DB_HOST,
+      user: DB_USER,
+      password: DB_PASS,
+      database: DB_NAME,
+    });
+
+    const [rows] = await connection.execute(
+      'SELECT email FROM clientes WHERE id = ?',
+      [cpf]
+    );
+
+    await connection.end();
+
+    if (rows.length === 0) {
+      return {
+        statusCode: 401,
+        body: JSON.stringify({ error: 'CPF não encontrado.' }),
+      };
+    }
+
+    const email = rows[0].email;
+
+    // Autenticar no Cognito usando email + senha recebida
+    const authResult = await cognito
+      .adminInitiateAuth({
+        AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+        ClientId: COGNITO_CLIENT_ID,
+        UserPoolId: COGNITO_USER_POOL_ID,
+        AuthParameters: {
+          USERNAME: email,
+          PASSWORD: senha,
+        },
+      })
+      .promise();
 
     return {
       statusCode: 200,
       body: JSON.stringify({
-        message: 'Cliente autenticado com sucesso',
-        cliente,
+        message: 'Login realizado com sucesso',
+        tokens: authResult.AuthenticationResult,
       }),
     };
   } catch (error) {
     console.error('Erro na Lambda:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Erro interno da Lambda' }),
+      body: JSON.stringify({ error: 'Erro interno', detalhes: error.message }),
     };
   }
 };
