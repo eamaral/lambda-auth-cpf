@@ -25,7 +25,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Conexão com o banco
     const connection = await mysql.createConnection({
       host: DB_HOST,
       user: DB_USER,
@@ -43,13 +42,12 @@ exports.handler = async (event) => {
     if (rows.length === 0) {
       return {
         statusCode: 401,
-        body: JSON.stringify({ error: 'CPF não encontrado.' }),
+        body: JSON.stringify({ error: 'CPF não encontrado no banco.' }),
       };
     }
 
     const email = rows[0].email;
 
-    // Autenticar no Cognito usando email + senha recebida
     const authResult = await cognito
       .adminInitiateAuth({
         AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
@@ -73,7 +71,10 @@ exports.handler = async (event) => {
     console.error('Erro na Lambda:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Erro interno', detalhes: error.message }),
+      body: JSON.stringify({
+        error: 'Erro ao autenticar via CPF',
+        detalhes: error.message,
+      }),
     };
   }
 };
